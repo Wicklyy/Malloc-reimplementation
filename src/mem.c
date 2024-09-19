@@ -9,6 +9,16 @@
 #include "mem_os.h"
 #include <assert.h>
 
+
+//-------------------------------------------------------------
+// Structure liste chainée
+//-------------------------------------------------------------
+
+typedef struct fb{
+	size_t size;
+	struct fb *next;
+}fb ;
+
 //-------------------------------------------------------------
 // mem_init
 //-------------------------------------------------------------
@@ -17,8 +27,10 @@
  * If already init it will re-init.
 **/
 void mem_init() {
-    //TODO: implement
-	assert(! "NOT IMPLEMENTED !");
+	fb *maillon;
+	maillon = mem_space_get_addr();
+	maillon->size = mem_space_get_size()-sizeof(fb);
+	maillon->next = NULL;
 }
 
 //-------------------------------------------------------------
