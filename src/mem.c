@@ -12,7 +12,7 @@
 
 
 mem_fit_function_t* Mff = &mem_first_fit;
-mem_free_block_t  *tete= NULL;
+mem_free_block_t  *head= NULL;
 
 
 //-------------------------------------------------------------
@@ -34,9 +34,9 @@ struct mem_free_block_s{
  * If already init it will re-init.
 **/
 void mem_init() {
-	tete = mem_space_get_addr();
-	tete->size = (size_t) (mem_space_get_size()-sizeof(mem_free_block_t));
-	tete->next = NULL;
+	head = mem_space_get_addr();
+	head->size = (size_t) (mem_space_get_size()-sizeof(mem_free_block_t));
+	head->next = NULL;
 }
 
 //-------------------------------------------------------------
@@ -51,25 +51,25 @@ void *mem_alloc(size_t size) {
 	if ((taille = (sizeof(mem_free_block_t) + size)%sizeof(int))!=0){
 		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
 	}
-	mem_free_block_t *block = Mff(tete,size);
+	mem_free_block_t *block = Mff(head,size);
 	if(block != NULL){		/* Chargement en debut de structure*/
 		void *adress = (char*)block + sizeof(mem_free_block_t);
 		mem_free_block_t *new = NULL;
+		if(block->size-size < sizeof(mem_free_block_t)) size = block->size;
 		if(size != block->size){
 			new = (adress+size);
 			new->next = block->next;
 			new->size = block->size - size - sizeof(mem_free_block_t);
 		}
-		else{
-
-		}
+		else new = block->next;
+		
 		block->size=size;
 		//block->next = NULL; /* block aloué ne doit pas pointer dans la liste */	
 		
 			/* Nouveau chainage */
-		if(tete == block) tete = new;
+		if(head == block) head = new;
 		else{
-			mem_free_block_t *curent = tete, *past = curent;
+			mem_free_block_t *curent = head, *past = curent;
 			while(curent != block){
 				past = curent;
 				curent = curent->next;
@@ -106,11 +106,38 @@ size_t mem_get_size(void * zone)
  * Free an allocaetd bloc.
 **/
 void mem_free(void *zone) {
+	mem_free_block_t *info = (mem_free_block_t *)((char *)zone-sizeof(mem_free_block_t));
+	
+	if(head == NULL){
+		head = info;
+		info->next = NULL;
+		return;
+	}
 
-
-    //TODO: implement
-	assert(! "NOT IMPLEMENTED !");
+	mem_free_block_t *next = head, *past = next;
+	void *addr = NULL;
+	while(next < info || next == NULL){		/* recuperer les deux maillon, precedent et suivant*/
+		past = next;
+		next = next->next;
+	}
+	
+	addr = (char *)info + info->size + sizeof(mem_free_block_t);
+	if(addr == next){
+		info->size +=next->size + sizeof(mem_free_block_t);
+		info->next = next->next;
+	} else info->next = next;
+	
+	if(next != past) past->next = info;
+	else head = info;						/* seul cas ou next == past, si on a pas avancer*/
+	
+	addr = (char *)past + past->size + sizeof(mem_free_block_t);
+	if(addr == info) {
+		past->size += info->size + sizeof(mem_free_block_t);
+		past->next = info->next;
+	}
 }
+
+
 
 //-------------------------------------------------------------
 // Itérateur(parcours) sur le contenu de l'allocateur
@@ -120,7 +147,7 @@ void mem_show(void (*print)(void *, size_t, int free)) {
 	void* adress = mem_space_get_addr();
 	size_t size = mem_space_get_size(), ssize;
 	bool free;
-	mem_free_block_t* curent = tete;
+	mem_free_block_t* curent = head;
 	mem_free_block_t *maillon;
 	while(size > 0){
 		//printf("%ld\n",size);
@@ -143,7 +170,6 @@ void mem_show(void (*print)(void *, size_t, int free)) {
 //-------------------------------------------------------------
 void mem_set_fit_handler(mem_fit_function_t *mff) {
 	Mff = mff;
-
 }
 
 //-------------------------------------------------------------
@@ -164,9 +190,10 @@ mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted
 	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
 	while(curent->next != NULL){
 		if(curent->size == wanted_size) return curent;
-		if(((renvoie == NULL) || (curent->size < renvoie->size)) && curent->size < wanted_size){
+		if(((renvoie == NULL) || (curent->size < renvoie->size)) && curent->size > wanted_size){
 			renvoie = curent;
-		}	
+		}
+		curent = curent->next;
 	}
 
 	return renvoie;
@@ -176,10 +203,11 @@ mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted
 mem_free_block_t *mem_worst_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
     if(first_free_block == NULL) return NULL;
 	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
-	while(curent->next != NULL){
+	while(curent != NULL){
 		if(((renvoie == NULL) || (curent->size > renvoie->size)) && curent->size > wanted_size){
 			renvoie = curent;
-		}	
+		}
+		curent = curent->next;
 	}
 
 	return renvoie;
