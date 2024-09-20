@@ -12,7 +12,7 @@
 
 
 mem_fit_function_t* Mff = NULL;
-
+mem_free_block_t  *tete= NULL;
 
 
 //-------------------------------------------------------------
@@ -20,15 +20,11 @@ mem_fit_function_t* Mff = NULL;
 //-------------------------------------------------------------
 
 struct mem_free_block_s{
-	char free;
 	size_t size;
-	struct fb *next;
+	struct mem_free_block_s *next;
 };
 
-typedef struct mem_used_block_s{
-	char free;
-	size_t size;
-}mem_used_block_t;
+
 
 //-------------------------------------------------------------
 // mem_init
@@ -38,11 +34,9 @@ typedef struct mem_used_block_s{
  * If already init it will re-init.
 **/
 void mem_init() {
-	mem_free_block_t *maillon;
-	maillon = mem_space_get_addr();
-	maillon->free = (char)0xF;
-	maillon->size = (size_t) (mem_space_get_size()-sizeof(mem_free_block_t));
-	maillon->next = NULL;
+	tete = mem_space_get_addr();
+	tete->size = (size_t) (mem_space_get_size()-sizeof(mem_free_block_t));
+	tete->next = NULL;
 }
 
 //-------------------------------------------------------------
@@ -52,26 +46,31 @@ void mem_init() {
  * Allocate a bloc of the given size.
 **/
 void *mem_alloc(size_t size) {
-
-	mem_free_block_t *block = Mff(mem_space_get_addr(),size);
+	if (Mff == NULL) return NULL;
+	size_t taille;
+	if ((taille = (sizeof(mem_free_block_t) + size)%sizeof(int))!=0){
+		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
+	}
+	mem_free_block_t *block = Mff(tete,size);
 	if(block != NULL){		/* Chargement en debut de structure*/
-		void *adress = block + sizeof(mem_used_block_t);
-		if(block == mem_space_get_addr()) adress += sizeof(mem_free_block_t);
-		*(mem_used_block_t*)(adress - sizeof(mem_used_block_t)) = (mem_used_block_t) {free:(char)0x0, size:size};
+		void *adress = block + sizeof(mem_free_block_t);
+		block->size=size; 
 		mem_free_block_t *new = (adress+size);
 		new->next = block->next;
-		new->size = block->size - size - sizeof(mem_used_block_t);
-		new->free = (char)0xF;
+		new->size = block->size - size - sizeof(mem_free_block_t);
+		//block->next = NULL; /* block aloué ne doit pas pointer dans la liste */	
 		
 			/* Nouveau chainage */
-		mem_free_block_t *curent = mem_space_get_addr(), *past = curent;
-		while(curent != block){
-			curent = curent->next;
-			past = past->next;
+		if(tete == block) tete = new;
+		else{
+			mem_free_block_t *curent = tete, *past = curent;
+			while(curent != block){
+				past = curent;
+				curent = curent->next;
+			}
+			past->next = new;
 		}
-		past->next = new;
-
-	
+		
 		/*					   Chargement en fin de block 
 		void* adress = block + sizeof(mem_free_block_t) + block->size - size; 	
 		//mem_used_block_t init = {size};
@@ -112,8 +111,24 @@ void mem_free(void *zone) {
 // mem_show
 //-------------------------------------------------------------
 void mem_show(void (*print)(void *, size_t, int free)) {
-    //TODO: implement
-	assert(! "NOT IMPLEMENTED !");
+	void* adress = mem_show_addr();
+	int size = mem_space_get_size(), ssize;
+	bool free;
+	mem_free_block_t* curent = tete;
+	mem_free_block_t *maillon;
+	while(size > 0){
+		maillon = adress;
+		ssize = maillon->size;
+		
+		if(curent == maillon){
+			bool = true;
+			curent = curent->next;
+		}else bool = false;
+		
+		print(adress + sizeof(mem_free_block_t),ssize,bool);
+		size -= ssize+ sizeof(mem_free_block_t);
+		adress+=ssize+sizeof(mem_free_blok_t);
+	}
 }
 
 //-------------------------------------------------------------
@@ -128,9 +143,12 @@ void mem_set_fit_handler(mem_fit_function_t *mff) {
 // Stratégies d'allocation
 //-------------------------------------------------------------
 mem_free_block_t *mem_first_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
-    //TODO: implement
-	assert(! "NOT IMPLEMENTED !");
-	return NULL;
+	mem_free_block_t *renvoie = tete;
+	while((renvoie->size)<wanted_size){
+		if(renvoie->next == NULL) return NULL; //On est a la fin de notre liste chainée et rien n'est assez grand
+		renvoie = renvoie->next;
+	}
+	return renvoie;
 }
 //-------------------------------------------------------------
 mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
