@@ -8,10 +8,10 @@
 #include "mem_space.h"
 #include "mem_os.h"
 #include <assert.h>
+#include <stdbool.h>
 
 
-
-mem_fit_function_t* Mff = NULL;
+mem_fit_function_t* Mff = &mem_first_fit;
 mem_free_block_t  *tete= NULL;
 
 
@@ -47,17 +47,19 @@ void mem_init() {
 **/
 void *mem_alloc(size_t size) {
 	if (Mff == NULL) return NULL;
-	size_t taille;
+	/*size_t taille;
 	if ((taille = (sizeof(mem_free_block_t) + size)%sizeof(int))!=0){
 		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
-	}
+	}*/
 	mem_free_block_t *block = Mff(tete,size);
 	if(block != NULL){		/* Chargement en debut de structure*/
 		void *adress = block + sizeof(mem_free_block_t);
-		block->size=size; 
+		printf("%p\n",&block->size);
+		
 		mem_free_block_t *new = (adress+size);
 		new->next = block->next;
 		new->size = block->size - size - sizeof(mem_free_block_t);
+		block->size=size;
 		//block->next = NULL; /* block aloué ne doit pas pointer dans la liste */	
 		
 			/* Nouveau chainage */
@@ -88,8 +90,7 @@ void *mem_alloc(size_t size) {
 //-------------------------------------------------------------
 size_t mem_get_size(void * zone)
 {
-	mem_used_block_t part = *((mem_used_block_t *)zone-sizeof(mem_used_block_t)); 
-	if(part.free == (char)0xF) return part.size;
+	//TODO
 	return 0;
 }
 
@@ -111,23 +112,24 @@ void mem_free(void *zone) {
 // mem_show
 //-------------------------------------------------------------
 void mem_show(void (*print)(void *, size_t, int free)) {
-	void* adress = mem_show_addr();
-	int size = mem_space_get_size(), ssize;
+	void* adress = mem_space_get_addr();
+	size_t size = mem_space_get_size(), ssize;
 	bool free;
 	mem_free_block_t* curent = tete;
 	mem_free_block_t *maillon;
 	while(size > 0){
+		printf("%ld\n",size);
 		maillon = adress;
 		ssize = maillon->size;
 		
 		if(curent == maillon){
-			bool = true;
+			free = true;
 			curent = curent->next;
-		}else bool = false;
+		}else free = false;
 		
-		print(adress + sizeof(mem_free_block_t),ssize,bool);
-		size -= ssize+ sizeof(mem_free_block_t);
-		adress+=ssize+sizeof(mem_free_blok_t);
+		print(adress + sizeof(mem_free_block_t),ssize,free);
+		size = size - (ssize+ sizeof(mem_free_block_t));
+		adress+=ssize+sizeof(mem_free_block_t);
 	}
 }
 
@@ -143,7 +145,7 @@ void mem_set_fit_handler(mem_fit_function_t *mff) {
 // Stratégies d'allocation
 //-------------------------------------------------------------
 mem_free_block_t *mem_first_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
-	mem_free_block_t *renvoie = tete;
+	mem_free_block_t *renvoie = first_free_block;
 	while((renvoie->size)<wanted_size){
 		if(renvoie->next == NULL) return NULL; //On est a la fin de notre liste chainée et rien n'est assez grand
 		renvoie = renvoie->next;
