@@ -160,14 +160,27 @@ mem_free_block_t *mem_first_fit(mem_free_block_t *first_free_block, size_t wante
 }
 //-------------------------------------------------------------
 mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
-    //TODO: implement
-	assert(! "NOT IMPLEMENTED !");
-	return NULL;
+    if(first_free_block == NULL) return NULL;
+	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
+	while(curent->next != NULL){
+		if(curent->size == wanted_size) return curent;
+		if(((renvoie == NULL) || (curent->size < renvoie->size)) && curent->size < wanted_size){
+			renvoie = curent;
+		}	
+	}
+
+	return renvoie;
 }
 
 //-------------------------------------------------------------
 mem_free_block_t *mem_worst_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
-    //TODO: implement
-	assert(! "NOT IMPLEMENTED !");
-	return NULL;
+    if(first_free_block == NULL) return NULL;
+	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
+	while(curent->next != NULL){
+		if(((renvoie == NULL) || (curent->size > renvoie->size)) && curent->size > wanted_size){
+			renvoie = curent;
+		}	
+	}
+
+	return renvoie;
 }
