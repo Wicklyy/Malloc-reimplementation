@@ -46,7 +46,7 @@ void mem_init() {
  * Allocate a bloc of the given size.
 **/
 void *mem_alloc(size_t size) {
-	if (Mff == NULL) return NULL;
+	if (Mff == NULL || size == 0) return NULL;
 	size_t taille;
 	if ((taille = (sizeof(mem_free_block_t) + size)%sizeof(int))!=0){
 		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
@@ -95,8 +95,9 @@ void *mem_alloc(size_t size) {
 //-------------------------------------------------------------
 size_t mem_get_size(void * zone)
 {
-	//TODO
-	return 0;
+	if (zone == NULL) return 0;
+	mem_free_block_t *current = (char *)zone - (sizeof(mem_free_block_t)); //Current est le pointeur associé à la structure de la zone
+	return current->size;
 }
 
 //-------------------------------------------------------------
@@ -106,6 +107,7 @@ size_t mem_get_size(void * zone)
  * Free an allocaetd bloc.
 **/
 void mem_free(void *zone) {
+	if(zone==NULL){return;}
 	mem_free_block_t *info = (mem_free_block_t *)((char *)zone-sizeof(mem_free_block_t));
 	
 	if(head == NULL){
