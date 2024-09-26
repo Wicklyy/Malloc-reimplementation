@@ -118,7 +118,7 @@ void mem_free(void *zone) {
 
 	mem_free_block_t *next = head, *past = next;
 	void *addr = NULL;
-	while(next < info || next == NULL){		/* recuperer les deux maillon, precedent et suivant*/
+	while(next < info && next != NULL){		/* recuperer les deux maillon, precedent et suivant*/
 		past = next;
 		next = next->next;
 	}
@@ -190,7 +190,7 @@ mem_free_block_t *mem_first_fit(mem_free_block_t *first_free_block, size_t wante
 mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
     if(first_free_block == NULL) return NULL;
 	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
-	while(curent->next != NULL){
+	while(curent != NULL){
 		if(curent->size == wanted_size) return curent;
 		if(((renvoie == NULL) || (curent->size < renvoie->size)) && curent->size > wanted_size){
 			renvoie = curent;
