@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
         // On libère à intervalle aléatoire un bloc occupé d'adresse aléatoire
         // parmis les blocs alloué en mémoire
         if (rand() % FREQ_FREE == 0) {
-            free = ((rand() % (i + 1)) - 1);
+            free = ((rand() % (i + 1)));
             printf("Libération %d\n", free);
             assert(allocs[free] <
                    (void *)((char *)mem_space_get_addr() + mem_space_get_size()));

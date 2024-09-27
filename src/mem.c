@@ -24,6 +24,10 @@ struct mem_free_block_s{
 	struct mem_free_block_s *next;
 };
 
+typedef struct mem_used_block_s{
+	size_t size;
+}mem_used_block_t;
+
 
 
 //-------------------------------------------------------------
@@ -35,7 +39,7 @@ struct mem_free_block_s{
 **/
 void mem_init() {
 	head = mem_space_get_addr();
-	head->size = (size_t) (mem_space_get_size()-sizeof(mem_free_block_t));
+	head->size = (size_t) (mem_space_get_size()-sizeof(mem_used_block_t));
 	head->next = NULL;
 }
 
@@ -48,18 +52,20 @@ void mem_init() {
 void *mem_alloc(size_t size) {
 	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourn NULL en cas de size=0 rajouter "|| size==0"*/
 	size_t taille;
-	if ((taille = (sizeof(mem_free_block_t) + size)%sizeof(int))!=0){
+	if ((taille = (sizeof(mem_used_block_t) + size)%sizeof(int))!=0){
 		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
 	}
 	mem_free_block_t *block = Mff(head,size);
 	if(block != NULL){		/* Chargement en debut de structure*/
-		void *adress = (char*)block + sizeof(mem_free_block_t);
-		mem_free_block_t *new = NULL;
-		if(block->size-size < sizeof(mem_free_block_t)) size = block->size;
+		void *adress = (char*)block + sizeof(mem_used_block_t);			/* valeur a return*/
+
+		if(block->size-size < sizeof(mem_free_block_t)) size = block->size;			/* si il n'y a pas assez de place pour stocker la struct d'un maillon on augmente la taille alouer*/
+
+		mem_free_block_t *new = NULL;			/* calcule des donnee du nouveau maillon */
 		if(size != block->size){
 			new = (adress+size);
 			new->next = block->next;
-			new->size = block->size - size - sizeof(mem_free_block_t);
+			new->size = block->size - size - sizeof(mem_used_block_t);
 		}
 		else new = block->next;
 		
@@ -96,7 +102,7 @@ void *mem_alloc(size_t size) {
 size_t mem_get_size(void * zone)
 {
 	if (zone == NULL) return 0;
-	mem_free_block_t *current = (mem_free_block_t *)(char *)(zone - (sizeof(mem_free_block_t))); //Current est le pointeur associé à la structure de la zone
+	mem_used_block_t *current = (mem_used_block_t *)(char *)(zone - (sizeof(mem_used_block_t))); //Current est le pointeur associé à la structure de la zone
 	return current->size;
 }
 
@@ -108,7 +114,7 @@ size_t mem_get_size(void * zone)
 **/
 void mem_free(void *zone) {
 	if(zone==NULL){return;}
-	mem_free_block_t *info = (mem_free_block_t *)((char *)zone-sizeof(mem_free_block_t));
+	mem_free_block_t *info = (mem_free_block_t *)((char *)zone - sizeof(mem_used_block_t));
 	
 	if(head == NULL){
 		head = info;
@@ -123,18 +129,18 @@ void mem_free(void *zone) {
 		next = next->next;
 	}
 	
-	addr = (char *)info + info->size + sizeof(mem_free_block_t);
+	addr = (char *)info + info->size + sizeof(mem_used_block_t);
 	if(addr == next){
-		info->size +=next->size + sizeof(mem_free_block_t);
+		info->size +=next->size + sizeof(mem_used_block_t);
 		info->next = next->next;
 	} else info->next = next;
 	
 	if(next != past) past->next = info;
 	else head = info;						/* seul cas ou next == past, si on a pas avancer*/
 	
-	addr = (char *)past + past->size + sizeof(mem_free_block_t);
+	addr = (char *)past + past->size + sizeof(mem_used_block_t);
 	if(addr == info) {
-		past->size += info->size + sizeof(mem_free_block_t);
+		past->size += info->size + sizeof(mem_used_block_t);
 		past->next = info->next;
 	}
 }
@@ -147,23 +153,26 @@ void mem_free(void *zone) {
 //-------------------------------------------------------------
 void mem_show(void (*print)(void *, size_t, int free)) {
 	void* adress = mem_space_get_addr();
+	void* toPrint = NULL;
 	size_t size = mem_space_get_size(), ssize;
 	bool free;
 	mem_free_block_t* curent = head;
 	mem_free_block_t *maillon;
 	while(size > 0){
-		//printf("%ld\n",size);
 		maillon = adress;
 		ssize = maillon->size;
-		
-		if(curent == maillon){
+
+		if(maillon == curent){
 			free = true;
 			curent = curent->next;
-		}else free = false;
+		}else {
+			free = false;
+		}
 		
-		print((adress + sizeof(mem_free_block_t) - (size_t)mem_space_get_addr()),ssize,free);
-		size = size - (ssize+ sizeof(mem_free_block_t));
-		adress+=ssize+sizeof(mem_free_block_t);
+		toPrint = (void *)(adress + sizeof(mem_used_block_t) - (size_t)mem_space_get_addr() );
+		print(toPrint,ssize,free);
+		size -= ssize + sizeof(mem_used_block_t);
+		adress += ssize + sizeof(mem_used_block_t);
 	}
 }
 
