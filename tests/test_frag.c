@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
         // parmis les blocs alloué en mémoire
         if (rand() % FREQ_FREE == 0) {
             free = ((rand() % (i + 1)));
-            printf("Libération %d\n", free);
+            printf("Libération a %p\n", allocs[free]);
             assert(allocs[free] <
                    (void *)((char *)mem_space_get_addr() + mem_space_get_size()));
             mem_free(allocs[free]);
