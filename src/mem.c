@@ -38,23 +38,22 @@ void afficheListe(){
 	int i = 0;
 	//printf("%p\n", mem_space_get_addr());
 	while(maillon != NULL){
-		valeur = (maillon->next != NULL) ? ((unsigned long)maillon->next - (size_t)mem_space_get_addr()) : 0;
+		valeur = (maillon->next != NULL) ? ((unsigned long)maillon->next - (size_t)mem_space_get_addr()) : 128000;
 		printf("%d: (address=%lu, size=%ld, next=%lu\n", i++, (unsigned long)maillon - (unsigned long)mem_space_get_addr(), maillon->size, valeur);
 		maillon=maillon->next;
 	}
 	//printf("\n\n");
 }
 
-bool locate(mem_used_block_t *zone){
+bool locate(mem_used_block_t *zone){		/* renvoie vrai si la zone est allouer */
 	mem_used_block_t *curent = (mem_used_block_t *) mem_space_get_addr();
 	//mem_free_block_t *maillon = head;
-	size_t size = mem_space_get_size(), taille = 0;
-	while(size < 0){
-		if(zone == curent) return true;
+	size_t taille = 0;
+	while(curent < zone){
 		taille = curent->size + sizeof(mem_used_block_t);
-		size-= taille;
-		curent += taille;
+		curent = (mem_used_block_t *)((void *)curent + taille);
 	}
+	if((void*) zone == (void *)curent) return true;
 	
 	return false;
 }
@@ -82,7 +81,7 @@ void *mem_alloc(size_t size) {
 	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourn NULL en cas de size=0 rajouter "|| size==0"*/
 	size_t taille;
 	if ((taille = (sizeof(mem_used_block_t) + size)%ALLIGNEMENT)!=0){
-		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
+		size = size + ALLIGNEMENT - taille; //On evite les erreurs d'alignement du cache
 	}
 	mem_free_block_t *block = Mff(head,size);
 	if(block != NULL){		/* Chargement en debut de structure*/
@@ -147,7 +146,7 @@ void mem_free(void *zone) {
 	if(zone==NULL){return;}
 	mem_free_block_t *info = (mem_free_block_t *)((char *)zone - sizeof(mem_used_block_t));
 	
-	if(!locate(zone)){return;}		/* verification si la zone est allouer */
+	if(!locate((mem_used_block_t *)info)){return;}		/* verification si la zone est allouer */
 	
 	if(head == NULL){
 		head = info;

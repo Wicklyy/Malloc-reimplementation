@@ -32,6 +32,7 @@ void aide() {
     fprintf(stderr, "M         :   afficher la liste de tous les emplacements "
                     "memoire (libres et occupes)\n");
     fprintf(stderr, "m         :   afficher le dump de la memoire\n");
+    fprintf(stderr, "s         :   afficher la liste chainer\n");
     fprintf(stderr, "h         :   afficher cette aide\n");
     fprintf(stderr, "q         :   quitter ce programme\n");
     fprintf(stderr, "\n");
@@ -110,6 +111,9 @@ int main(int argc, char **argv) {
             for (i = 0; i < mem_space_get_size(); i++)
                 printf("%d ", adresse[i]);
             printf("]\n");
+            break;
+        case 's':
+            afficheListe();
             break;
         case 'h':
             aide();
