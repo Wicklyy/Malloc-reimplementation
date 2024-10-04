@@ -32,6 +32,7 @@ int main(int argc, char *argv[]) {
             printf("Stratégie worst fit\n");
         }
     }
+    //srand(2);
     srand(time(NULL));
     fprintf(stderr,
             "Test réalisant des series d'allocations / désallocations\n"
@@ -42,18 +43,24 @@ int main(int argc, char *argv[]) {
     int free = 0;
     // On alloue en boucle des bloc de tailles variable et aléatoire comprise
     // entre 1 et MAX_BLOC
+    int valueLib =0; 
     while ((i < MAX_ALLOC) && (allocs[i] = mem_alloc(size)) != NULL) {
+        if(i >= 23){
+            printf("oui\n");
+        }
         printf("%d -------------------------------\n", i);
         printf("Allocation en %d\n",
                (int)((char *)allocs[i] - (char *)mem_space_get_addr()));
         assert(allocs[i] <
                (void *)((char *)mem_space_get_addr() + mem_space_get_size()));
 
+
         // On libère à intervalle aléatoire un bloc occupé d'adresse aléatoire
         // parmis les blocs alloué en mémoire
         if (rand() % FREQ_FREE == 0) {
             free = ((rand() % (i + 1)));
-            printf("Libération a %p\n", allocs[free]);
+            valueLib = (allocs[free] == NULL) ? 0 : (int)((char *)allocs[free] - (char *)mem_space_get_addr());
+            printf("Libération a %d\n", valueLib);
             assert(allocs[free] <
                    (void *)((char *)mem_space_get_addr() + mem_space_get_size()));
             mem_free(allocs[free]);
