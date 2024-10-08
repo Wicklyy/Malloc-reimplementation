@@ -16,7 +16,8 @@
 mem_fit_function_t* Mff = &mem_first_fit;
 mem_free_block_t  *head= NULL;
 
-#define ALIGNEMENT sizeof(int) //Variable permettant d'aligner la mémoire
+/*Variable permettant d'aligner la mémoire*/
+#define ALIGNEMENT sizeof(int) 
 
 
 //-------------------------------------------------------------
@@ -36,15 +37,15 @@ typedef struct mem_used_block_s{
 // Fonction auxilere
 //-------------------------------------------------------------
 
-/* renvoie vrai si le pointeur fait partie des zone allouer ou libre */
+/* renvoie vrai si le pointeur zone est bien dirigé vers le debut d'une zone et faux s'il est au milieu d'une zone mémoire */
 bool locate(mem_used_block_t *zone){		
-	mem_used_block_t *curent = (mem_used_block_t *) mem_space_get_addr();
+	mem_used_block_t *curent = (mem_used_block_t *) mem_space_get_addr(); //curent est l'adresse de début de la mémoire
 	size_t taille = 0;
-	while(curent < zone){
+	while(curent < zone){ //On se déplace dans la mémoire jusqu'à arriver à la zone à vérifier
 		taille = curent->size + sizeof(mem_used_block_t);
 		curent = (mem_used_block_t *)((void *)curent + taille);
 	}
-	if((void*) zone == (void *)curent) return true;
+	if((void*) zone == (void *)curent) return true; //Si on est bien sur une structure mem_free_block_t ou mem_used_t on renvoie true
 	
 	return false;
 }
@@ -70,23 +71,23 @@ void mem_init() {
 **/
 void *mem_alloc(size_t size) {
 	
-	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourn NULL en cas de size=0 rajouter "|| size==0"*/
+	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourne NULL en cas de malloc(0), rajouter "|| size==0" (c'est un choix)*/
 	size_t taille;
-	if(size < sizeof(mem_free_block_t) - sizeof(mem_used_block_t)) size = sizeof(mem_used_block_t); 
+	if(size < sizeof(mem_free_block_t) - sizeof(mem_used_block_t)) size = sizeof(mem_free_block_t) - sizeof(mem_used_block_t); //vérifie qu'on ait de quoi stocker une mem_free_block_t lors de la libération de la zone
 	if ((taille = (sizeof(mem_used_block_t) + size)%ALIGNEMENT)!=0){
-		size = size + ALLIGNEMENT - taille; //On evite les erreurs d'alignement du cache
+		size = size + ALIGNEMENT - taille; //On evite les erreurs d'alignement du cache
 	}
-	mem_free_block_t *block = Mff(head,size);
+	mem_free_block_t *block = Mff(head,size);//Adresse vers la structure rattachée au bloc mémoire à allouer
 	if(block != NULL){		/* Chargement en debut de structure*/
-		void *adress = (char*)block + sizeof(mem_used_block_t);			/* valeur a return*/
+		void *adress = (char*)block + sizeof(mem_used_block_t);	/*adresse a return*/
 
-		if(block->size-size < sizeof(mem_free_block_t)) size = block->size;			/* si il n'y a pas assez de place pour stocker la struct d'un maillon on augmente la taille alouer*/
-
+		if(block->size-size < sizeof(mem_free_block_t)) size = block->size;//On augmente la taille de size à celle du bloc mémoire si 
+										   //on ne peut pas stocker de nouvelle structure dans le bloc mémoire résiduel
 		mem_free_block_t *new = NULL;			/* calcule des donnee du nouveau maillon */
 		if(size != block->size){
-			new = (adress+size);
-			new->next = block->next;
-			new->size = block->size - size - sizeof(mem_used_block_t);
+			new = (adress+size);//On place une nouvelle structure dans le bloc mémoire résiduel
+			new->next = block->next; //On remplace notre bloc dans la liste chainée par le nouveau
+			new->size = block->size - size - sizeof(mem_used_block_t);//Taille du bloc residuel
 		}
 		else new = block->next;
 		
@@ -98,7 +99,7 @@ void *mem_alloc(size_t size) {
 			}
 		else{
 			mem_free_block_t *curent = head, *past = curent;
-			while(curent != block){
+			while(curent != block){ //On se déplace dans la liste chainée jusqu'à arriver à l'endroit du nouveau chainage
 				past = curent;
 				curent = curent->next;
 			}
@@ -127,39 +128,39 @@ size_t mem_get_size(void * zone)
  * Free an allocaetd bloc.
 **/
 void mem_free(void *zone) {
-	if(mem_space_get_addr() > zone || zone > mem_space_get_addr() + mem_space_get_size()) return;
+	if(mem_space_get_addr() > zone || zone > mem_space_get_addr() + mem_space_get_size()) return; //On vérifie que zone est bien dans la zone de la mémoire
 	
-	mem_free_block_t *info = (mem_free_block_t *)((char *)zone - sizeof(mem_used_block_t));
+	mem_free_block_t *info = (mem_free_block_t *)((char *)zone - sizeof(mem_used_block_t)); //Info est le pointeur vers la structure mémoire de zone
 	
-	if(!locate((mem_used_block_t *)info)) return;		/* verification si la zone est allouer */
+	if(!locate((mem_used_block_t *)info)) return;	/*verification si zone est bien un pointeur vers un bloc mémoire */
 	
-	if(head == NULL){
+	if(head == NULL){ //La mémoire entière est allouée, donc on créer une nouvelle tête
 		head = info;
 		info->next = NULL;
 		return;
 	}
 
-	mem_free_block_t *next = head, *past = next;
+	mem_free_block_t *next = head, *past = next; //next et past sont des zones LIBRES, précédant et suivant la zone à libérer
 	void *addr = NULL;
-	while(next < info && next != NULL ){		/* recuperer les deux maillon, precedent et suivant*/
+	while(next < info && next != NULL ){ //On se déplace dans nos zones libres pour trouver les zones "devant" et "derrière" la zone à libérer
 		past = next;
 		next = next->next;
 	}
-	if(info == past || info == next) return;
+	if(info == past || info == next) return; //La zone est déjà libre
 
-	addr = (char *)info + info->size + sizeof(mem_used_block_t);
-	if(addr == next){
+	addr = (char *)info + info->size + sizeof(mem_used_block_t); //addr est le pointeur vers la structure suivant info
+	if(addr == next){ //On vérifie si le bloc mémoire suivant zone est libre
 		info->size +=next->size + sizeof(mem_used_block_t);
-		info->next = next->next;
-	} else info->next = next;
+		info->next = next->next; //Si oui on fusionne les deux zones
+	} else info->next = next; //Si non on chaine notre zone avec la zone suivante
 	
-	if(next != past) past->next = info;
-	else head = info;						/* seul cas ou next == past, si on a pas avancer*/
+	if(next != past) past->next = info; //On lie past next avec info et on corrige après si info et past se fusionnent
+	else head = info;/*Si next == past, cela veut dire qu'info est le premier element de la mémoire a être libre*/
 	
-	addr = (char *)past + past->size + sizeof(mem_used_block_t);
-	if(addr == info) {
+	addr = (char *)past + past->size + sizeof(mem_used_block_t); //addr est le pointeur vers la structure suivant past
+	if(addr == info) { //On regarde si past et info sont contigues
 		past->size += info->size + sizeof(mem_used_block_t);
-		past->next = info->next;
+		past->next = info->next;//Si elles le sont on les fusionne
 	}
 }
 
@@ -198,12 +199,13 @@ void mem_show(void (*print)(void *, size_t, int free)) {
 // mem_fit
 //-------------------------------------------------------------
 void mem_set_fit_handler(mem_fit_function_t *mff) {
-	Mff = mff;
+	Mff = mff; //On set une fonction de recherche de zone à allouer
 }
 
 //-------------------------------------------------------------
 // Stratégies d'allocation
 //-------------------------------------------------------------
+//Stratégie d'allocation où on parcours notre liste chainée et on renvoie le pointeur vers la première zone mémoire assez grande pour contenir wanted_size
 mem_free_block_t *mem_first_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
 	if(first_free_block == NULL) return NULL;
 	mem_free_block_t *renvoie = first_free_block;
@@ -214,6 +216,7 @@ mem_free_block_t *mem_first_fit(mem_free_block_t *first_free_block, size_t wante
 	return renvoie;
 }
 //-------------------------------------------------------------
+//Stratégie où on parcourt notre liste chainée et on cherche la zone avec la zone mémoire residuelle la plus petite
 mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
     if(first_free_block == NULL) return NULL;
 	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
@@ -229,6 +232,7 @@ mem_free_block_t *mem_best_fit(mem_free_block_t *first_free_block, size_t wanted
 }
 
 //-------------------------------------------------------------
+//Stratégie où on parcourt notre liste chainée et on cherche la zone avec la zone mémoire residuelle la plus grande
 mem_free_block_t *mem_worst_fit(mem_free_block_t *first_free_block, size_t wanted_size) {
     if(first_free_block == NULL) return NULL;
 	mem_free_block_t *renvoie = NULL, *curent = first_free_block;
