@@ -16,7 +16,7 @@
 mem_fit_function_t* Mff = &mem_first_fit;
 mem_free_block_t  *head= NULL;
 
-#define ALLIGNEMENT sizeof(int)
+#define ALIGNEMENT sizeof(int) //Variable permettant d'aligner la mémoire
 
 
 //-------------------------------------------------------------
@@ -73,7 +73,7 @@ void *mem_alloc(size_t size) {
 	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourn NULL en cas de size=0 rajouter "|| size==0"*/
 	size_t taille;
 	if(size < sizeof(mem_free_block_t) - sizeof(mem_used_block_t)) size = sizeof(mem_used_block_t); 
-	if ((taille = (sizeof(mem_used_block_t) + size)%ALLIGNEMENT)!=0){
+	if ((taille = (sizeof(mem_used_block_t) + size)%ALIGNEMENT)!=0){
 		size = size + ALLIGNEMENT - taille; //On evite les erreurs d'alignement du cache
 	}
 	mem_free_block_t *block = Mff(head,size);
