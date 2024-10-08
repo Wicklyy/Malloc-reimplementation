@@ -112,9 +112,6 @@ int main(int argc, char **argv) {
                 printf("%d ", adresse[i]);
             printf("]\n");
             break;
-        case 's':
-            afficheListe();
-            break;
         case 'h':
             aide();
             break;

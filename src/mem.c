@@ -10,22 +10,14 @@
 #include <assert.h>
 #include <stdbool.h>
 
-
+//-------------------------------------------------------------
+// Variable Globale
+//-------------------------------------------------------------
 mem_fit_function_t* Mff = &mem_first_fit;
 mem_free_block_t  *head= NULL;
 
 #define ALLIGNEMENT sizeof(int)
 
-
-
-//-------------------------------------------------------------
-// Fonction a supprimer
-//-------------------------------------------------------------
-
-void afficher_zone_tmp(void *adresse, size_t taille, int free) {
-    printf("Zone %s, Adresse : %lu, Taille : %lu\n", free ? "libre" : "occupee",
-           (unsigned long)adresse, (unsigned long)taille);
-}
 
 //-------------------------------------------------------------
 // Structure liste chainée
@@ -40,35 +32,13 @@ typedef struct mem_used_block_s{
 	size_t size;
 }mem_used_block_t;
 
+//-------------------------------------------------------------
+// Fonction auxilere
+//-------------------------------------------------------------
 
-void check(){
-	mem_free_block_t *curent = head;
-	while(curent!= NULL){
-		if(((((char*) curent) + curent->size + sizeof(mem_used_block_t)) > (char*)curent->next) && curent->next != NULL ){
-			printf("probleme dans le check\n");
-		}
-		curent = curent->next;
-	}
-}
-
-
-void afficheListe(){
-	//mem_show(afficher_zone_tmp);
-	/*mem_free_block_t *maillon = head;
-	unsigned long valeur;
-	int i = 0;
-	//printf("%p\n", mem_space_get_addr());
-	while(maillon != NULL){
-		valeur = (maillon->next != NULL) ? ((unsigned long)maillon->next - (size_t)mem_space_get_addr()) : 128000;
-		printf("%d: (address=%lu, size=%ld, next=%lu\n", i++, (unsigned long)maillon - (unsigned long)mem_space_get_addr(), maillon->size, valeur);
-		maillon=maillon->next;
-	}
-	//printf("\n\n");*/
-}
-
-bool locate(mem_used_block_t *zone){		/* renvoie vrai si la zone est allouer */
+/* renvoie vrai si le pointeur fait partie des zone allouer ou libre */
+bool locate(mem_used_block_t *zone){		
 	mem_used_block_t *curent = (mem_used_block_t *) mem_space_get_addr();
-	//mem_free_block_t *maillon = head;
 	size_t taille = 0;
 	while(curent < zone){
 		taille = curent->size + sizeof(mem_used_block_t);
@@ -99,10 +69,7 @@ void mem_init() {
  * Allocate a bloc of the given size.
 **/
 void *mem_alloc(size_t size) {
-	/*check();
-	if(head->size > 127992){
-		printf("OK\n");
-	}*/
+	
 	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourn NULL en cas de size=0 rajouter "|| size==0"*/
 	size_t taille;
 	if(size < sizeof(mem_free_block_t) - sizeof(mem_used_block_t)) size = sizeof(mem_used_block_t); 
@@ -124,7 +91,6 @@ void *mem_alloc(size_t size) {
 		else new = block->next;
 		
 		block->size=size;
-		//block->next = NULL; /* block aloué ne doit pas pointer dans la liste */	
 		
 			/* Nouveau chainage */
 		if(head == block) {
@@ -162,19 +128,14 @@ size_t mem_get_size(void * zone)
 **/
 void mem_free(void *zone) {
 	if(mem_space_get_addr() > zone || zone > mem_space_get_addr() + mem_space_get_size()) return;
-	printf("avant free\n");
-	afficheListe();
 	
 	mem_free_block_t *info = (mem_free_block_t *)((char *)zone - sizeof(mem_used_block_t));
 	
-	if(!locate((mem_used_block_t *)info)){printf("apres free\n");
-	afficheListe();return;}		/* verification si la zone est allouer */
+	if(!locate((mem_used_block_t *)info)) return;		/* verification si la zone est allouer */
 	
 	if(head == NULL){
 		head = info;
 		info->next = NULL;
-		printf("apres free\n");
-		afficheListe();
 		return;
 	}
 
@@ -200,8 +161,6 @@ void mem_free(void *zone) {
 		past->size += info->size + sizeof(mem_used_block_t);
 		past->next = info->next;
 	}
-	printf("apres free\n");
-	afficheListe();
 }
 
 
