@@ -51,15 +51,15 @@ void *mem_alloc(size_t size) {
 	if ((taille = (sizeof(mem_free_block_t) + size)%sizeof(int))!=0){
 		size = size + sizeof(int) - taille; //On evite les erreurs d'alignement du cache
 	}
-	mem_free_block_t *block = Mff(head,size);
+	mem_free_block_t *block = Mff(head,size); //Adresse vers la structure rattachée au bloc mémoire à allouer
 	if(block != NULL){		/* Chargement en debut de structure*/
-		void *adress = (char*)block + sizeof(mem_free_block_t);
+		void *adress = (char*)block + sizeof(mem_free_block_t); //adresse vers le bloc mémoire sans sa structure
 		mem_free_block_t *new = NULL;
-		if(block->size-size < sizeof(mem_free_block_t)) size = block->size;
-		if(size != block->size){
-			new = (adress+size);
-			new->next = block->next;
-			new->size = block->size - size - sizeof(mem_free_block_t);
+		if(block->size-size < sizeof(mem_free_block_t)) size = block->size; //On augmente la taille de size à celle du bloc mémoire si 
+		if(size != block->size){					    //on ne peut pas stocker de nouvelle structure dans le bloc mémoire résiduel
+			new = (adress+size); //On place une nouvelle structure dans le bloc mémoire résiduel
+			new->next = block->next; //On remplace notre bloc dans la liste chainée par le nouveau
+			new->size = block->size - size - sizeof(mem_free_block_t); //Taille du bloc residuel
 		}
 		else new = block->next;
 		
@@ -67,15 +67,15 @@ void *mem_alloc(size_t size) {
 		//block->next = NULL; /* block aloué ne doit pas pointer dans la liste */	
 		
 			/* Nouveau chainage */
-		if(head == block) head = new;
+		if(head == block) head = new; 
 		else{
 			mem_free_block_t *curent = head, *past = curent;
-			while(curent != block){
+			while(curent != block){ //On se déplace dans la liste chainée jusqu'à arriver à l'endroit du nouveau chainage
 				past = curent;
 				curent = curent->next;
 			}
 			if(new == NULL) past->next = block->next;
-			else past->next = new;
+			else past->next = new; 
 		}
 		
 		/*					   Chargement en fin de block 
