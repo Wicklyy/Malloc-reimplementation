@@ -194,7 +194,9 @@ void* mem_realoc(void* ptr, size_t size){
 			past->size = past->size - (size - info->size);
 		}
 		p->size = size;
-		return (void *)p + sizeof(mem_used_block_t);
+		void * ptrr = (void *)p + sizeof(mem_used_block_t);
+		memcpy(ptrr, ptr, mem_get_size(ptr));
+		return ptrr;
 	}
 	return NULL;
 
