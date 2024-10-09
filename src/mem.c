@@ -54,6 +54,14 @@ bool locate(mem_used_block_t *zone){
 	return false;
 }
 
+size_t alignement(size_t size){
+	size_t taille;
+	if ((taille = (sizeof(mem_used_block_t) + size)%ALIGNEMENT)!=0){
+		size = size + ALIGNEMENT - taille; //On evite les erreurs d'alignement du cache
+	}
+	return size;
+}
+
 //-------------------------------------------------------------
 // mem_init
 //-------------------------------------------------------------
@@ -78,9 +86,8 @@ void *mem_alloc(size_t size) {
 	if (Mff == NULL) return NULL;		/* Si on veut que mem_alloc retourne NULL en cas de malloc(0), rajouter "|| size==0" (c'est un choix)*/
 	size_t taille;
 	if(size < sizeof(mem_free_block_t) - sizeof(mem_used_block_t)) size = sizeof(mem_free_block_t) - sizeof(mem_used_block_t); //vérifie qu'on ait de quoi stocker une mem_free_block_t lors de la libération de la zone
-	if ((taille = (sizeof(mem_used_block_t) + size)%ALIGNEMENT)!=0){
-		size = size + ALIGNEMENT - taille; //On evite les erreurs d'alignement du cache
-	}
+	size = alignement(size);
+
 	mem_free_block_t *block = Mff(head,size);//Adresse vers la structure rattachée au bloc mémoire à allouer
 	if(block != NULL){		/* Chargement en debut de structure*/
 		void *adress = (char*)block + sizeof(mem_used_block_t);	/*adresse a return*/
@@ -143,18 +150,21 @@ void* mem_realoc(void* ptr, size_t size){
 	}
 
 	/* check si l'allocation n'a pas fonctionné parceque memoire est trop fragmenter*/	
-	mem_free_block_t *curent = head, *past = head;
+	mem_free_block_t *curent = head, *past = head, *ppast = head;
 	while((void *)curent < (void *)info && curent!=NULL){
+		ppast = past;
 		past = curent;
 		curent = curent->next;
 	}
 	bool full = false;
-	if((char*)info + sizeof(mem_used_block_t) + info->size == (char*) curent /* il existe un bloque situer directement apres le bloque*/
+	size = alignement(size);
+	if(((char*)info + sizeof(mem_used_block_t) + info->size == (char*) curent) /* il existe un bloque situer directement apres le bloque*/
 		&& (curent->size + info->size + sizeof(mem_used_block_t)) >= size){ /* on a assez d'espace */
 		if((curent->size + info->size + sizeof(mem_used_block_t) - size) < sizeof(mem_free_block_t)) {
 			size = info->size + curent->size + sizeof(mem_used_block_t);
 			full = true;
 		}
+
 		mem_free_block_t *new;
 		if(full) new = curent->next;
 		else{
@@ -168,6 +178,23 @@ void* mem_realoc(void* ptr, size_t size){
 		}
 		info->size = size;
 		return ptr;
+	}
+	else if(((char*)past + sizeof(mem_used_block_t) + past->size == (char*) info) /* il existe un bloque situer directement avant le bloque*/
+		&& (past->size + info->size + sizeof(mem_used_block_t)) >= size){
+		if((past->size + info->size + sizeof(mem_used_block_t) - size) < sizeof(mem_free_block_t)) {
+			size = info->size + past->size + sizeof(mem_used_block_t);
+			full = true;
+		}
+		mem_used_block_t *p = (mem_used_block_t *) ((char *)info - (size - info->size));
+		if(full) {
+			if(past != head) ppast->next = curent;
+			else head = curent;
+		}
+		else{
+			past->size = past->size - (size - info->size);
+		}
+		p->size = size;
+		return (void *)p + sizeof(mem_used_block_t);
 	}
 	return NULL;
 
