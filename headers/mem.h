@@ -13,9 +13,11 @@
 /* Interface utilisateur de votre allocateur      */
 /* -----------------------------------------------*/
 void *mem_alloc(size_t);
+void *mem_realoc(void* ptr, size_t size);
 void mem_free(void *);
 size_t mem_get_size(void *);
 void afficheListe();
+
 
 
 /* Itérateur sur le contenu de l'allocateur */

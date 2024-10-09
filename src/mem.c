@@ -9,6 +9,7 @@
 #include "mem_os.h"
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 
 //-------------------------------------------------------------
 // Variable Globale
@@ -40,12 +41,15 @@ typedef struct mem_used_block_s{
 /* renvoie vrai si le pointeur zone est bien dirigé vers le debut d'une zone et faux s'il est au milieu d'une zone mémoire */
 bool locate(mem_used_block_t *zone){		
 	mem_used_block_t *curent = (mem_used_block_t *) mem_space_get_addr(); //curent est l'adresse de début de la mémoire
+	mem_free_block_t *free_block = head;
 	size_t taille = 0;
 	while(curent < zone){ //On se déplace dans la mémoire jusqu'à arriver à la zone à vérifier
+		if((void *)free_block == (void *)curent) free_block = free_block->next;
 		taille = curent->size + sizeof(mem_used_block_t);
 		curent = (mem_used_block_t *)((void *)curent + taille);
 	}
-	if((void*) zone == (void *)curent) return true; //Si on est bien sur une structure mem_free_block_t ou mem_used_t on renvoie true
+	
+	if( ((void *) zone == (void *)curent) && ((void *)curent != (void *)free_block) ) return true; //Si on est bien sur une block de memoire non allouer on renvoie true
 	
 	return false;
 }
@@ -117,8 +121,57 @@ void *mem_alloc(size_t size) {
 size_t mem_get_size(void * zone)
 {
 	if (zone == NULL) return 0;
-	mem_used_block_t *current = (mem_used_block_t *)(char *)(zone - (sizeof(mem_used_block_t))); //Current est le pointeur associé à la structure de la zone
+	mem_used_block_t *current = (mem_used_block_t *)((char *)(zone - (sizeof(mem_used_block_t)))); //Current est le pointeur associé à la structure de la zone
 	return current->size;
+}
+
+//-------------------------------------------------------------
+// mem_realloc
+//-------------------------------------------------------------
+
+void* mem_realoc(void* ptr, size_t size){
+	void *adress = NULL;
+	mem_used_block_t *info = (mem_used_block_t *)((char*)ptr - sizeof(mem_used_block_t));
+
+	if(!locate(info)) return adress;
+	if( mem_get_size(ptr) > size ) return ptr;
+
+	if((adress = mem_alloc(size)) != NULL){
+		memcpy(adress, ptr, mem_get_size(ptr));
+		mem_free(ptr);
+		return adress;
+	}
+
+	/* check si l'allocation n'a pas fonctionné parceque memoire est trop fragmenter*/	
+	mem_free_block_t *curent = head, *past = head;
+	while((void *)curent < (void *)info && curent!=NULL){
+		past = curent;
+		curent = curent->next;
+	}
+	bool full = false;
+	if((char*)info + sizeof(mem_used_block_t) + info->size == (char*) curent /* il existe un bloque situer directement apres le bloque*/
+		&& (curent->size + info->size + sizeof(mem_used_block_t)) >= size){ /* on a assez d'espace */
+		if((curent->size + info->size + sizeof(mem_used_block_t) - size) < sizeof(mem_free_block_t)) {
+			size = info->size + curent->size + sizeof(mem_used_block_t);
+			full = true;
+		}
+		mem_free_block_t *new;
+		if(full) new = curent->next;
+		else{
+			new = (mem_free_block_t *)((char*) curent + size - info->size);
+			new->size = curent->size - (size - info->size);
+		}
+		if(head != curent) past->next = new;
+		else{
+			if(new != NULL) new->next = head->next;
+			head = new;
+		}
+		info->size = size;
+		return ptr;
+	}
+	return NULL;
+
+
 }
 
 //-------------------------------------------------------------

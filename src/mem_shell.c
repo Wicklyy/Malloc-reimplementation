@@ -20,6 +20,7 @@ void aide() {
     fprintf(stderr, "Saisir l'une des commandes suivantes\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "a taille  :   allouer un bloc de la taille souhaitee\n");
+    fprintf(stderr, "r adresse taille  :   realloue un bloc de la taille souhaitee en conservant le contenue\n");
     fprintf(stderr,
             "l adresse :   librer un bloc alloue precedemment a adresse\n");
     fprintf(
@@ -76,6 +77,17 @@ int main(int argc, char **argv) {
         case 'a':
             scanf("%d", &taille);
             ptr = mem_alloc(taille);
+            allocations[nb_alloc] = ptr;
+            nb_alloc++;
+            if (ptr == NULL)
+                printf("Echec de l'allocation\n");
+            else
+                printf("Memoire allouee en %d\n",
+                       (int)(ptr - mem_space_get_addr()));
+            break;
+        case 'r':
+            scanf("%d %d", &offset, &taille);
+            ptr = mem_realoc(mem_space_get_addr() + offset, taille);
             allocations[nb_alloc] = ptr;
             nb_alloc++;
             if (ptr == NULL)
