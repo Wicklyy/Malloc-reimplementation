@@ -19,6 +19,7 @@ void aide() {
     fprintf(stderr, "Aide :\n");
     fprintf(stderr, "Saisir l'une des commandes suivantes\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "c 'f'/'b'/'w' : modifie la stratégie d'allocation f: first fit, b: best fit, w: worst fit\n");
     fprintf(stderr, "a taille  :   allouer un bloc de la taille souhaitee\n");
     fprintf(stderr, "r adresse taille  :   realloue un bloc de la taille souhaitee en conservant le contenue\n");
     fprintf(stderr,
@@ -74,6 +75,26 @@ int main(int argc, char **argv) {
         fflush(stdout);
         commande = getchar();
         switch (commande) {
+        case 'c':
+            scanf(" %c", &commande);
+            switch (commande){
+            case 'f':
+                mem_set_fit_handler(mem_first_fit);
+                printf("strategie definie en first fit\n");
+                break;
+            case 'b':
+                mem_set_fit_handler(mem_best_fit);
+                printf("strategie definie en best fit \n");
+                break;
+            case 'w':
+                mem_set_fit_handler(mem_worst_fit);
+                printf("strategie definie en worst fit \n");
+                break;
+            default:
+                fprintf(stderr, "Strategie inconnue !\n");
+                break;
+            }
+            break;
         case 'a':
             scanf("%d", &taille);
             ptr = mem_alloc(taille);
